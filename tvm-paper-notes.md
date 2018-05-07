@@ -74,5 +74,44 @@
     - memory reuse across threads
     - tensorized compute intrinsics
     - latency hiding
-- 
+
+## Optimizing Computational Graphs
+
+### Computational Graph
+
+- Computational graphs are a common way to represent programs in DL frameworks. 
+- They provide a global view on computation tasks, yet avoid specifying how each computation task needs to be implemented. 
+
+
+
+### Operator Fusion
+
+- An optimization that can greatly reduce execution time, particulary in GPUs and specialized accelerators.
+- The idea is to **combine multiple operators together into a single kernel without saving the intermediate results back into global memory**
  
+![](https://i.imgur.com/mlNhoDT.png)
+
+**Four categories of graph operators**:
+
+- Injective (one-to-one map)
+- Reduction
+- Complex-out-fusable (can fuse element-wise map to output)
+- Opaque (cannot be fused)
+
+![](https://i.imgur.com/XnhSWVN.png)
+
+### Data Layout Transformation
+
+- Tensor operations are the basic operators of computational graphs
+- They can have divergent layout requirements across different operations
+- Optimizing data layout starts with specifying the preferred data layout of each operator given the constraints dictating their implementation in hardware.
+
+![](https://i.imgur.com/0J5QxGs.png)
+
+### Limitations of Graph-Level Optimizations
+
+- They are only as effective as what the operator library provides.
+- Currently, the few DL frameworks that support operator fusion require the operator library to provide an implementation of the fused patterns.
+    - With more network operators introduced on a regular basis, this approach is no longer sustainable when targeting an increasing number of hardware back-ends.
+- It is not feasible to handcraft operator kernels for this massive space of back-end specific operators
+    - TVM provides a code-generation approach that can generate tensor operators. 
