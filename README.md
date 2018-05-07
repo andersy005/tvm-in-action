@@ -4,3 +4,4 @@
 
 This repo hosts my notes, tutorial materials (source code) for TVM stack as I explore the incredible explosition of deep-learning frameworks and how to bring them together. 
 
+[](./tvm-paper-notes.md)
