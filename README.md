@@ -38,11 +38,15 @@ This repo hosts my notes, tutorial materials (source code) for TVM stack as I ex
 - **Current operator-level libraries** that DL frameworks rely on are:
   - too rigid
   - specialized
+
+
   ---> to be easily ported **across hardware devices**
 
 - To address these weaknesses, we need a **compiler framework** that can expose optimization opportunities across both
   - graph-level and
   - operator-level
+
+
   ---> to deliver competitive performance across hardware back-ends.
 
 ### Four fundamental challenges at the computation graph level and tensor operator level
@@ -123,3 +127,5 @@ This repo hosts my notes, tutorial materials (source code) for TVM stack as I ex
     - With more network operators introduced on a regular basis, this approach is no longer sustainable when targeting an increasing number of hardware back-ends.
 - It is not feasible to handcraft operator kernels for this massive space of back-end specific operators
     - TVM provides a code-generation approach that can generate tensor operators. 
+
+## Optimizing Tensor Operations
