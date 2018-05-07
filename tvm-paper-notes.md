@@ -1,4 +1,4 @@
-# [TVM: End-to-End Optimization Stack for Deep Learning](https://arxiv.org/abs/1802.04799)
+# [Summary of TVM: End-to-End Optimization Stack for Deep Learning](https://arxiv.org/abs/1802.04799)
 
 ## Abstract
 
@@ -18,7 +18,7 @@
 
 - Hardware targets significantly diverge in terms of memory organization, compute, etc..
 
-![](https://imgur.com/a/UIXENRC)
+![](https://i.imgur.com/XRSZMt0.png)
 
 - *The Goal*: **easily deploy DL workloads to all kinds of hardware targets, including embedded devives, GPUs, FPGAs, ASCIs (e.g, the TPU).**
 
@@ -50,4 +50,29 @@
    - Cooperation among threads on shared memory loaded is required for optimized kernels. 
 
 3. **Tensorized compute intrinsics:**
-   - The latest hardware provides new instructions that go beyond vector operations like the 
+   - The latest hardware provides new instructions that go beyond vector operations like the GEMM operator in TPU or the tensor core in NVIDIA's Volta.
+   - Consequently, the scheduling procedure must break computation into tensor arithmetic intrinsics instead of scalar or vector code.
+
+4. **Latency Hiding**
+    - Traditional architectures with simultaneous multithreading and automatically managed caches implicitly hide latency in modern CPUs/GPUs.
+    - Specialized accelerator designs favor learner control and offload most of the scheduling complexity to the compiler stack.
+    - Still, scheduling must be peformed carefully to hide memory access latency.
+
+
+### TVM: An End-to-End Optimization Stack
+
+- An end-to-end optimizing compiler stack to lower and fine-tune DL workloads to diverse hardware back-ends. 
+- Designed to separate:
+  - the algorithm description
+  - schedule
+  - hardware interface
+- This separation enables **support for novel specialized accelerators** and **their corresponding new intrinsics**. 
+- TVM presents **two optimization layers**:
+  - a computation graph optimization layer to address:
+    - High-level dataflow rewriting
+  - a tensor optimization layer with new schedule primitives to address:
+    - memory reuse across threads
+    - tensorized compute intrinsics
+    - latency hiding
+- 
+ 
