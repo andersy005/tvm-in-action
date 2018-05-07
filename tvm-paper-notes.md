@@ -30,11 +30,13 @@
 - **Current operator-level libraries** that DL frameworks rely on are:
   - too rigid
   - specialized
+
   ---> to be easily ported **across hardware devices**
 
 - To address these weaknesses, we need a **compiler framework** that can expose optimization opportunities across both
   - graph-level and
   - operator-level
+
   ---> to deliver competitive performance across hardware back-ends.
 
 ### Four fundamental challenges at the computation graph level and tensor operator level
@@ -115,3 +117,66 @@
     - With more network operators introduced on a regular basis, this approach is no longer sustainable when targeting an increasing number of hardware back-ends.
 - It is not feasible to handcraft operator kernels for this massive space of back-end specific operators
     - TVM provides a code-generation approach that can generate tensor operators. 
+
+## Optimizing Tensor Operations
+
+### Tensor Expression Language
+
+- TVM introduces a dataflow tensor expression language to support automatic code generation.
+- Unlike high-level computation graph languages, where the implementation of tensor operations is opaque, *each operation is described in an index formula expression language*.
+
+![](https://i.imgur.com/LG1pguT.png)
+
+- TVM tensor expression language supports common arithmetic and math operations found in common language like C. 
+- TVM explicitly introduces a **commutative reduction** operator to easily schedule commutative reductions across multiple threads. 
+- TVM further introduces a **high-order scan operator** that can combine basic compute operators to form recurrent computations over time. 
+
+### Schedule Space 
+
+- Given a tensor expression, it is challenging to create high-performance implementations for each hardware back-end. 
+- Each optimized low-level program is the result of different combinations of scheduling strategies, imposing a large burden on the kernel writer.
+- TVM adopts the **principle of decoupling compute descriptions from schedule optimizations**.
+- Schedules are the specific rules that lower compute descriptions down to back-end-optimized implementations. 
+
+![](https://i.imgur.com/JUikGQz.png)
+
+![](https://i.imgur.com/BCg6gCz.png)
+
+
+### Nested Parallelism with Cooperation
+
+- Parallel programming is key to improving the efficiency of compute intensive kernels in deep learning workloads. 
+- Modern GPUs offer massive parallelism 
+    
+    ---> Requiring TVM to bake parallel programming models into schedule transformations
+
+- Most existing solutions adopt a parallel programming model referred to as [nested parallel programs](https://youtu.be/4lS_WThsFoM), which is a form of [fork-join parallelism](https://en.wikipedia.org/wiki/Fork%E2%80%93join_model). 
+- TVM uses a parallel schedule primitive to parallelize a data parallel task
+  - Each parallel task can be further recursively subdivided into subtasks to exploit the multi-level thread hierarchy on the target architecture (e.g, thread groups in GPU)
+- This model is called **shared-nothing nested parallelism**
+  - One working thread cannot look at the data of its sibling within the same parallel computation stage.
+  - Interactions between sibling threads happen at the join stage, when the subtasks are done and the next stage can consume the data produced by the previous stage. 
+  - This programming model **does not enable threads to cooperate with each other in order to perform collective task within the same parallel stage**.
+
+- A better alternative to the shared-nothing approach is to **fetch data cooperatively across threads**
+    - This pattern is well known in GPU programming using languages like CUDA, OpenCL and Metal.
+    - **It has not been implemented into a schedule primitive.**
+- TVM introduces the **concept of memory scopes to the schedule space**, so that a stage can be marked as shared.
+    - Without memory scopes, automatic scope inference will mark the relevant stage as thread-local.
+    - Memory scopes are useful to GPUs.
+    - Memory scopes allow us to tag special memory buffers and create special lowering rules when targeting specialized deep learning accelerators. 
+
+![](https://i.imgur.com/HHYtujL.png)
+
+
+### Tensorization: Generalizing the Hardware Interface
+
+- **Tensorization** problem is analogous to the **vectorization** problem for [SIMD architectures](https://en.wikipedia.org/wiki/SIMD). 
+- Tensorization differs significantly from vectorization
+    - The inputs to the tensor compute primitives are multi-dimensional, with fixed or variable lengths, and dictate different data layouts.
+    - Cannot resort to a fixed set of primitives, as new DL accelerators are emerging with their own flavors of tensor instructions. 
+- To solve this challenge, TVM **separates the hardware interface from the schedule**:
+    - TVM introduces a tensor intrinsic declaration mechanism
+    - TVM uses the tensor expression language to declare the behavior of each new hardware intrinsic, as well as the lowering rule associated to it. 
+    - TVM introduces a **tensorize** schedule primitive to replace a unit of computation with the corresponding tensor intrinsics. 
+    - The compiler matches the computation pattern with a hardware declaration, and lowers it to the corresp
