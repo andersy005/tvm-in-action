@@ -39,13 +39,11 @@ This repo hosts my notes, tutorial materials (source code) for TVM stack as I ex
   - too rigid
   - specialized
 
-
   ---> to be easily ported **across hardware devices**
 
 - To address these weaknesses, we need a **compiler framework** that can expose optimization opportunities across both
   - graph-level and
   - operator-level
-
 
   ---> to deliver competitive performance across hardware back-ends.
 
@@ -129,3 +127,118 @@ This repo hosts my notes, tutorial materials (source code) for TVM stack as I ex
     - TVM provides a code-generation approach that can generate tensor operators. 
 
 ## Optimizing Tensor Operations
+
+### Tensor Expression Language
+
+- TVM introduces a dataflow tensor expression language to support automatic code generation.
+- Unlike high-level computation graph languages, where the implementation of tensor operations is opaque, *each operation is described in an index formula expression language*.
+
+![](https://i.imgur.com/LG1pguT.png)
+
+- TVM tensor expression language supports common arithmetic and math operations found in common language like C. 
+- TVM explicitly introduces a **commutative reduction** operator to easily schedule commutative reductions across multiple threads. 
+- TVM further introduces a **high-order scan operator** that can combine basic compute operators to form recurrent computations over time. 
+
+### Schedule Space 
+
+- Given a tensor expression, it is challenging to create high-performance implementations for each hardware back-end. 
+- Each optimized low-level program is the result of different combinations of scheduling strategies, imposing a large burden on the kernel writer.
+- TVM adopts the **principle of decoupling compute descriptions from schedule optimizations**.
+- Schedules are the specific rules that lower compute descriptions down to back-end-optimized implementations. 
+
+![](https://i.imgur.com/JUikGQz.png)
+
+![](https://i.imgur.com/BCg6gCz.png)
+
+
+### Nested Parallelism with Cooperation
+
+- Parallel programming is key to improving the efficiency of compute intensive kernels in deep learning workloads. 
+- Modern GPUs offer massive parallelism 
+    
+    ---> Requiring TVM to bake parallel programming models into schedule transformations
+
+- Most existing solutions adopt a parallel programming model referred to as [nested parallel programs](https://youtu.be/4lS_WThsFoM), which is a form of [fork-join parallelism](https://en.wikipedia.org/wiki/Fork%E2%80%93join_model). 
+- TVM uses a parallel schedule primitive to parallelize a data parallel task
+  - Each parallel task can be further recursively subdivided into subtasks to exploit the multi-level thread hierarchy on the target architecture (e.g, thread groups in GPU)
+- This model is called **shared-nothing nested parallelism**
+  - One working thread cannot look at the data of its sibling within the same parallel computation stage.
+  - Interactions between sibling threads happen at the join stage, when the subtasks are done and the next stage can consume the data produced by the previous stage. 
+  - This programming model **does not enable threads to cooperate with each other in order to perform collective task within the same parallel stage**.
+
+- A better alternative to the shared-nothing approach is to **fetch data cooperatively across threads**
+    - This pattern is well known in GPU programming using languages like CUDA, OpenCL and Metal.
+    - **It has not been implemented into a schedule primitive.**
+- TVM introduces the **concept of memory scopes to the schedule space**, so that a stage can be marked as shared.
+    - Without memory scopes, automatic scope inference will mark the relevant stage as thread-local.
+    - Memory scopes are useful to GPUs.
+    - Memory scopes allow us to tag special memory buffers and create special lowering rules when targeting specialized deep learning accelerators. 
+
+![](https://i.imgur.com/HHYtujL.png)
+
+
+### Tensorization: Generalizing the Hardware Interface
+
+- **Tensorization** problem is analogous to the **vectorization** problem for [SIMD architectures](https://en.wikipedia.org/wiki/SIMD). 
+- Tensorization differs significantly from vectorization
+    - The inputs to the tensor compute primitives are multi-dimensional, with fixed or variable lengths, and dictate different data layouts.
+    - Cannot resort to a fixed set of primitives, as new DL accelerators are emerging with their own flavors of tensor instructions. 
+- To solve this challenge, TVM **separates the hardware interface from the schedule**:
+    - TVM introduces a tensor intrinsic declaration mechanism
+    - TVM uses the tensor expression language to declare the behavior of each new hardware intrinsic, as well as the lowering rule associated to it. 
+    - TVM introduces a **tensorize** schedule primitive to replace a unit of computation with the corresponding tensor intrinsics. 
+    - The compiler matches the computation pattern with a hardware declaration, and lowers it to the corresping hardware intrinsic. 
+   
+
+### Compiler Support for Latency Hiding
+
+- **Latency Hiding:** refers to the process of overlapping memory operations with computation to maximize memory and compute utilization. 
+- It requires different different strategies depending on the hardware back-end that is being targeted. 
+- On CPUs, memory latency hiding is achieved **implicitly with simultaneous multithreading** or **hardware prefetching techniques**. 
+- GPUs rely on **rapid context switching of many wraps of threads** to maximize the utilization of functional units. 
+- TVM provides a virtual threading schedule primitive that lets the programmer specify a high-level data parallel program that TVM automatically lowers to a low-level explicit data dependence program. 
+
+
+## Code Generation and Runtime Support 
+
+### Code Generation
+
+- For a specific tuple of data-flow declaration, axis relation hyper-graph, and schedule tree, TVM can generate lowered code by:
+  - iteratively traversing the schedule tree
+  - inferring the dependent bounds of the input tensors (using the axis relation hyergraph)
+  - generating the loop nest in the low-level code
+- The code is lowered to an in-memory representation of an imperative C style loop program. 
+- TVM reuses a variant of Halide's the loop program data structure in this process. 
+- TVM reuses passes from Halide for common lowering primitives like storage flattening and unrolling, 
+  - and add GPU/accelerator-specific transformations such as:
+    - *synchronization point detection*
+    - *virtual thread injection**
+    - *module generation*
+- Finally, the loop program is transformed into **LLVM** or **CUDA/Metal/OpenCL** source code.
+
+### Runtime Support
+
+- For GPU programs, TVM builds the host and device modules **separately** and provide a runtime module system that launch kernels using corresponding driver APIs. 
+
+### Remote Deployment Profiling
+
+- TVM includes infrastructure to make profiling and autotuning easier on embedded devices. 
+- Traditionally, targeting an embedded device for tuning requires:
+  - cross-compiling on the host side, 
+  - copying to the target device, 
+  - and timing the execution
+
+- TVM provides remote function call support. Through the **RPC interface**:
+  - TVM compiles the program on a host compiler
+  - it uploads to remote embedded devices
+  - it runs the funcion remotely, 
+  - and it accesses the results in the same script on the host. 
+
+![](https://i.imgur.com/oL0Z9pp.png)
+
+
+## Conclusion
+
+- TVM provides an end-to-end stack to solve fundamental optimization challenges across a diverse set of hardware back-ends.
+- TVM can encourage more studies of programming languages, compilation, and open new opportunities for hardware co-design techniques for deep learning systems. 
+

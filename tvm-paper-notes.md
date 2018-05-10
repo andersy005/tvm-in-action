@@ -179,4 +179,58 @@
     - TVM introduces a tensor intrinsic declaration mechanism
     - TVM uses the tensor expression language to declare the behavior of each new hardware intrinsic, as well as the lowering rule associated to it. 
     - TVM introduces a **tensorize** schedule primitive to replace a unit of computation with the corresponding tensor intrinsics. 
-    - The compiler matches the computation pattern with a hardware declaration, and lowers it to the corresp
+    - The compiler matches the computation pattern with a hardware declaration, and lowers it to the corresping hardware intrinsic. 
+   
+
+### Compiler Support for Latency Hiding
+
+- **Latency Hiding:** refers to the process of overlapping memory operations with computation to maximize memory and compute utilization. 
+- It requires different different strategies depending on the hardware back-end that is being targeted. 
+- On CPUs, memory latency hiding is achieved **implicitly with simultaneous multithreading** or **hardware prefetching techniques**. 
+- GPUs rely on **rapid context switching of many wraps of threads** to maximize the utilization of functional units. 
+- TVM provides a virtual threading schedule primitive that lets the programmer specify a high-level data parallel program that TVM automatically lowers to a low-level explicit data dependence program. 
+
+
+## Code Generation and Runtime Support 
+
+### Code Generation
+
+- For a specific tuple of data-flow declaration, axis relation hyper-graph, and schedule tree, TVM can generate lowered code by:
+  - iteratively traversing the schedule tree
+  - inferring the dependent bounds of the input tensors (using the axis relation hyergraph)
+  - generating the loop nest in the low-level code
+- The code is lowered to an in-memory representation of an imperative C style loop program. 
+- TVM reuses a variant of Halide's the loop program data structure in this process. 
+- TVM reuses passes from Halide for common lowering primitives like storage flattening and unrolling, 
+  - and add GPU/accelerator-specific transformations such as:
+    - *synchronization point detection*
+    - *virtual thread injection**
+    - *module generation*
+- Finally, the loop program is transformed into **LLVM** or **CUDA/Metal/OpenCL** source code.
+
+### Runtime Support
+
+- For GPU programs, TVM builds the host and device modules **separately** and provide a runtime module system that launch kernels using corresponding driver APIs. 
+
+### Remote Deployment Profiling
+
+- TVM includes infrastructure to make profiling and autotuning easier on embedded devices. 
+- Traditionally, targeting an embedded device for tuning requires:
+  - cross-compiling on the host side, 
+  - copying to the target device, 
+  - and timing the execution
+
+- TVM provides remote function call support. Through the **RPC interface**:
+  - TVM compiles the program on a host compiler
+  - it uploads to remote embedded devices
+  - it runs the funcion remotely, 
+  - and it accesses the results in the same script on the host. 
+
+![](https://i.imgur.com/oL0Z9pp.png)
+
+
+## Conclusion
+
+- TVM provides an end-to-end stack to solve fundamental optimization challenges across a diverse set of hardware back-ends.
+- TVM can encourage more studies of programming languages, compilation, and open new opportunities for hardware co-design techniques for deep learning systems. 
+
