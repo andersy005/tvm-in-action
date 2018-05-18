@@ -39,7 +39,7 @@ CUDA_PATH = /usr/local/cuda
 USE_ROCM = 0
 
 # whether enable OpenCL during compile
-USE_OPENCL = 0
+USE_OPENCL = 1
 
 # whether enable Metal during compile
 USE_METAL = 0
